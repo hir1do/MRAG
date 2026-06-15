@@ -32,3 +32,102 @@ size_t DocumentProcessor::nextUTF8Boundary(const std::string& text, size_t start
     }
     return start;
 }
+
+std::string DocumentProcessor::cleanLine(const std::string& line){
+    std::string result;
+    result.reserve(line.size());
+    for(char c:line){
+        if(c != '\r'){
+            result.push_back(c);
+        }
+    }
+    return result;
+}
+
+bool  DocumentProcessor::isChapterTitle(const std::string& line){
+    static const std::regex CHAPTER_REGEX( R"(^(第.*[章节回卷]|Chapter\s+\d+))");
+    return std::regex_search(line, CHAPTER_REGEX);
+}
+
+std::vector<Chunk> DocumentProcessor::splitWithOverlap(const std::string& text, const std::string& chapter_title){
+    std::vector<Chunk> chunks;
+    int64_t chunk_id = 0;
+    size_t pos = 0;
+    size_t len = text.size();
+    
+    while(pos<len){
+        size_t end = std::min(pos + chunk_size, len);
+        end = nextUTF8Boundary(text, end);
+        size_t cut = end;
+        for (size_t i = end; i > pos; --i) {
+            if (isSentenceEnd(text[i - 1])) {
+                cut = i;
+                break;
+            }
+        }
+        if (cut <= pos) {
+            cut = end;
+        }
+
+        Chunk chunk;
+        chunk.id++;
+        chunk.text = text.substr(pos, cut - pos);
+        chunk.metadata = chapter_title;
+        chunks.push_back(std::move(chunk));
+
+        if(cut > len) break;
+
+        size_t next_pos = cut;
+        if (overlap_size > 0) {
+            if (next_pos >= overlap_size) {
+                next_pos -= overlap_size;
+            } else {
+                next_pos = 0;
+            }
+            next_pos = nextUTF8Boundary(text, next_pos);
+        }
+
+        pos = next_pos;
+    }
+    return chunks;
+}
+
+std::vector<Chunk> DocumentProcessor::processNovel(const std::string& FilePath){
+    std::ifstream file(FilePath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open file: " + FilePath);
+    }
+
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+
+    std::vector<Chunk> result;
+    std::string current_chapter = "unknown";
+
+    std::istringstream stream(content);
+    std::string line;
+
+    while (std::getline(stream, line)) {
+        line = cleanLine(line);
+
+        if (isChapterTitle(line)) {
+            current_chapter = line;
+            continue;
+        }
+
+        if (!line.empty()) {
+            auto chunks = splitWithOverlap(line, current_chapter);
+            result.insert(result.end(), chunks.begin(), chunks.end());
+        }
+    }
+
+    //文件末尾残留
+    if(!result.empty()){
+        const std::string& last_text = result.back().text;
+        if (last_text.size() < chunk_size){
+            //已作为最后一个 chunk 保存
+        }
+    }
+    return result;
+}

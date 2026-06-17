@@ -6,7 +6,7 @@
 static constexpr uint32_t MAGIC_NUMBER = 0x4D524147; // "MRAG"
 static constexpr uint32_t VERSION = 1;
 
-float VectorDatebase::cosineSimilarity(const std::vector<float>& a, const std::vector<float>& b){
+float VectorDatabase::cosineSimilarity(const std::vector<float>& a, const std::vector<float>& b){
     if (a.size() != b.size() || a.empty()) {
         return -1.0f;
     }
@@ -16,7 +16,7 @@ float VectorDatebase::cosineSimilarity(const std::vector<float>& a, const std::v
     }
     return dot;
 }
-std::vector<Chunk> VectorDatebase::search(const std::vector<float>& query_emb, size_t top_k) const {
+std::vector<Chunk> VectorDatabase::search(const std::vector<float>& query_emb, size_t top_k) const {
     if (chunks_.empty() || top_k == 0) {
         return {};
     }
@@ -48,7 +48,7 @@ std::vector<Chunk> VectorDatebase::search(const std::vector<float>& query_emb, s
     return result;
 }
 
-bool VectorDatebase::saveToDisk(const std::string& path) const{
+bool VectorDatabase::saveToDisk(const std::string& path) const{
     std::ofstream ofs(path, std::ios::binary);
     if (!ofs.is_open()) {
         std::cerr << "[VectorDB] Failed to write: " << path << "\n";
@@ -70,7 +70,7 @@ bool VectorDatebase::saveToDisk(const std::string& path) const{
     return true;
 }
 
-bool VectorDatebase::loadFromDisk(const std::string& path){
+bool VectorDatabase::loadFromDisk(const std::string& path){
     std::ifstream ifs(path, std::ios::binary);
     if (!ifs.is_open()) {
         std::cerr << "[VectorDB] Failed to read: " << path << "\n";

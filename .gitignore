@@ -1,0 +1,33 @@
+# Build directory
+build/
+build-debug/
+build-release/
+
+# Model files
+*.gguf
+models/
+models/embedding/
+models/generation/
+
+# Data files
+data/
+*.txt
+*.db
+*.mrag
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+*.cmake
+install_manifest.txt

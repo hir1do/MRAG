@@ -51,14 +51,15 @@ bool  DocumentProcessor::isChapterTitle(const std::string& line){
 
 std::vector<Chunk> DocumentProcessor::splitWithOverlap(const std::string& text, const std::string& chapter_title){
     std::vector<Chunk> chunks;
-    int64_t chunk_id = 0;
+    static uint64_t chunk_id_counter = 0;
     size_t pos = 0;
     size_t len = text.size();
     
-    while(pos<len){
+    while(pos < len){
         size_t end = std::min(pos + chunk_size, len);
         end = nextUTF8Boundary(text, end);
         size_t cut = end;
+        
         for (size_t i = end; i > pos; --i) {
             if (isSentenceEnd(text[i - 1])) {
                 cut = i;
@@ -70,12 +71,12 @@ std::vector<Chunk> DocumentProcessor::splitWithOverlap(const std::string& text, 
         }
 
         Chunk chunk;
-        chunk.id++;
+        chunk.id = chunk_id_counter++;
         chunk.text = text.substr(pos, cut - pos);
         chunk.metadata = chapter_title;
         chunks.push_back(std::move(chunk));
 
-        if(cut > len) break;
+        if (cut >= len) break;
 
         size_t next_pos = cut;
         if (overlap_size > 0) {
@@ -102,32 +103,35 @@ std::vector<Chunk> DocumentProcessor::processNovel(const std::string& FilePath){
     buffer << file.rdbuf();
     std::string content = buffer.str();
 
+    content = cleanLine(content);
+
     std::vector<Chunk> result;
     std::string current_chapter = "unknown";
+    std::string current_content;
 
     std::istringstream stream(content);
     std::string line;
 
     while (std::getline(stream, line)) {
-        line = cleanLine(line);
-
         if (isChapterTitle(line)) {
+            if (!current_content.empty()) {
+                auto chunks = splitWithOverlap(current_content, current_chapter);
+                result.insert(result.end(), chunks.begin(), chunks.end());
+                current_content.clear();
+            }
             current_chapter = line;
             continue;
         }
 
         if (!line.empty()) {
-            auto chunks = splitWithOverlap(line, current_chapter);
-            result.insert(result.end(), chunks.begin(), chunks.end());
+            current_content += line + "\n";
         }
     }
 
-    //文件末尾残留
-    if(!result.empty()){
-        const std::string& last_text = result.back().text;
-        if (last_text.size() < chunk_size){
-            //已作为最后一个 chunk 保存
-        }
+    if (!current_content.empty()) {
+        auto chunks = splitWithOverlap(current_content, current_chapter);
+        result.insert(result.end(), chunks.begin(), chunks.end());
     }
+
     return result;
 }

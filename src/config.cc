@@ -50,7 +50,7 @@ bool AppConfig::load(const std::string& path){
             temperature = j["generation"]["temperature"];
         }
         if(j["generation"].contains("top_k")){
-            top_k = j["generation"]["top_k"];
+            top_k_sampler = j["generation"]["top_k"];
         }
         if(j["generation"].contains("top_p")){
             top_p = j["generation"]["top_p"];

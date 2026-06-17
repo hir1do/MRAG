@@ -8,9 +8,9 @@
 
 #include"chunk.h"
 
-class VectorDatebase{
+class VectorDatabase{
 public:
-    VectorDatebase() = default;
+    VectorDatabase() = default;
     // 插入单个 Chunk
     void insert(const Chunk& chunk){ chunks_.push_back(chunk); };
     // 批量插入

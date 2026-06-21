@@ -12,9 +12,40 @@ inline bool isUTF8LeadByte(unsigned char c) {
     return (c & 0xC0) != 0x80;
 }
 
-// 判断是否为句末标点
-inline bool isSentenceEnd(char c) {
-    return c == '。' || c == '！' || c == '？' || c == '\n'|| c == '!'|| c == '?';
+// 判断是否为句末标点（检查 UTF-8 字节序列）
+// 中文句号 '。' = E3 80 82
+// 中文感叹号 '！' = EF BC 81
+// 中文问号 '？' = EF BC 9F
+inline bool isSentenceEnd(const std::string& text, size_t pos) {
+    if (pos >= text.size()) return false;
+
+    unsigned char c = static_cast<unsigned char>(text[pos]);
+
+    // 单字节标点
+    if (c == '\n' || c == '!' || c == '?') return true;
+
+    // 中文句号 '。' (E3 80 82)
+    if (c == 0xE3 && pos + 2 < text.size() &&
+        static_cast<unsigned char>(text[pos + 1]) == 0x80 &&
+        static_cast<unsigned char>(text[pos + 2]) == 0x82) {
+        return true;
+    }
+
+    // 中文感叹号 '！' (EF BC 81)
+    if (c == 0xEF && pos + 2 < text.size() &&
+        static_cast<unsigned char>(text[pos + 1]) == 0xBC &&
+        static_cast<unsigned char>(text[pos + 2]) == 0x81) {
+        return true;
+    }
+
+    // 中文问号 '？' (EF BC 9F)
+    if (c == 0xEF && pos + 2 < text.size() &&
+        static_cast<unsigned char>(text[pos + 1]) == 0xBC &&
+        static_cast<unsigned char>(text[pos + 2]) == 0x9F) {
+        return true;
+    }
+
+    return false;
 }
 
 }
@@ -61,7 +92,7 @@ std::vector<Chunk> DocumentProcessor::splitWithOverlap(const std::string& text, 
         size_t cut = end;
         
         for (size_t i = end; i > pos; --i) {
-            if (isSentenceEnd(text[i - 1])) {
+            if (isSentenceEnd(text, i - 1)) {
                 cut = i;
                 break;
             }

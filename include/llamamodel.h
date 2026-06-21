@@ -28,13 +28,16 @@ public:
     LlamaModel& operator=(LlamaModel&& other) noexcept;
     
     ModelMode mode() const { return mode_; }
-    int n_ctx() const { return llama_context_get_n_ctx(ctx_); }
+    int n_ctx() const { return config_.gen_n_ctx; }
 
-protected:
-    // 两次调用 llama_tokenize 获取精确 token 数
-    std::vector<llama_token> tokenize(const std::string& text, bool add_bos = true) const;
+    // 公共访问接口
     llama_model* model() const { return model_; }
     llama_context* ctx() const { return ctx_; }
+    
+    // 两次调用 llama_tokenize 获取精确 token 数
+    // add_bos: 是否添加 beginning-of-sequence token
+    // special: 是否处理特殊 token
+    std::vector<llama_token> tokenize(const std::string& text, bool add_bos = true, bool special = true) const;
 
 private:
     void free_resources();

@@ -9,8 +9,10 @@ extern "C" {
 #include "llama.h"
 }
 
-void silentLog(const char* text) {
+void silentLog(ggml_log_level level, const char* text, void* user_data) {
+    (void)level;
     (void)text;
+    (void)user_data;
 }
 
 void printUsage(const char* argv0) {
@@ -28,7 +30,7 @@ void printUsage(const char* argv0) {
 }
 
 int main(int argc, char* argv[]) {
-    llama_log_set(silentLog);
+    llama_log_set(silentLog, nullptr);
     
     std::string config_path = "config.json";
     std::string novel_path;

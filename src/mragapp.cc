@@ -3,7 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 
-MRAGApp::MRAGApp(const AppConfig& config) : config_(config), guard_() {
+MRAGApp::MRAGApp(const AppConfig& config) : guard_(), config_(config) {
     vector_db_ = std::make_unique<VectorDatabase>();
 }
 
@@ -42,8 +42,10 @@ bool MRAGApp::buildKnowledgeBase(const std::string& txt_path, const std::string&
         loadModels();
         
         std::cout << "[MRAG] Generating embeddings..." << std::endl;
-        for (auto& chunk : chunks) {
-            chunk.embedding = embedding_engine_->generateEmbedding(chunk.text);
+        for (size_t i = 0; i < chunks.size(); ++i) {
+            std::cout << "[MRAG] Processing chunk " << (i + 1) << "/" << chunks.size() 
+                      << " (len=" << chunks[i].text.size() << ")..." << std::endl;
+            chunks[i].embedding = embedding_engine_->generateEmbedding(chunks[i].text);
         }
         
         std::cout << "[MRAG] Inserting into vector database..." << std::endl;

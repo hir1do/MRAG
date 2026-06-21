@@ -1,7 +1,7 @@
 {
     "models": {
-        "embedding": "./models/bge-small-zh-v1.5-f16.gguf",
-        "generation": "./models/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+        "embedding": "/mnt/d/mrag/models/embedding/bge-small-zh-v1.5-f16.gguf",
+        "generation": "/mnt/d/mrag/models/generation/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf",
         "n_gpu_layers": 99
     },
     "document": {

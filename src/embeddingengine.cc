@@ -3,6 +3,36 @@
 #include <stdexcept>
 #include <algorithm>
 
+// RAII wrapper for llama_batch
+struct LlamaBatchGuard {
+    llama_batch batch;
+    bool owns_batch;
+    
+    LlamaBatchGuard(int n_tokens, int embd = 0, int n_seq_max = 1) 
+        : batch(llama_batch_init(n_tokens, embd, n_seq_max)), owns_batch(true) {}
+    
+    ~LlamaBatchGuard() {
+        if (owns_batch) {
+            llama_batch_free(batch);
+        }
+    }
+    
+    // 禁止拷贝
+    LlamaBatchGuard(const LlamaBatchGuard&) = delete;
+    LlamaBatchGuard& operator=(const LlamaBatchGuard&) = delete;
+    
+    // 允许移动
+    LlamaBatchGuard(LlamaBatchGuard&& other) noexcept 
+        : batch(other.batch), owns_batch(other.owns_batch) {
+        other.owns_batch = false;
+    }
+    
+    llama_batch* operator->() { return &batch; }
+    llama_batch& operator*() { return batch; }
+    
+    void release() { owns_batch = false; }
+};
+
 EmbeddingEngine::EmbeddingEngine(LlamaModel& model) : model_(model) {
     if (model.mode() != ModelMode::Embedding) {
         throw std::runtime_error("Model must be in Embedding mode");
@@ -61,19 +91,38 @@ size_t EmbeddingEngine::embeddingDim() const {
 std::vector<float> EmbeddingEngine::generateEmbedding(const std::string& text) {
     std::string sanitized_text = sanitizeUtf8(text);
     
-    std::vector<llama_token> tokens = model_.tokenize(sanitized_text);
+    if (sanitized_text.empty()) {
+        throw std::runtime_error("Embedding generation failed: empty text after sanitization");
+    }
+    
+    // 嵌入模型：不添加 BOS，禁用特殊 token 处理
+    std::vector<llama_token> tokens = model_.tokenize(sanitized_text, false, false);
+    
+    if (tokens.empty()) {
+        throw std::runtime_error("Embedding generation failed: tokenize returned empty");
+    }
+    
     tokens = truncateTokens(tokens);
     
-    llama_memory_clear(model_.ctx());
+    // 清空 KV Cache
+    llama_memory_t mem = llama_get_memory(model_.ctx());
+    llama_memory_clear(mem, true);
     
-    llama_batch batch = llama_batch_init(static_cast<int>(tokens.size()), 0, 1);
+    // 使用 RAII wrapper 管理 batch
+    LlamaBatchGuard guard(static_cast<int>(tokens.size()));
+    llama_batch& batch = guard.batch;
+    
     for (size_t i = 0; i < tokens.size(); ++i) {
-        llama_batch_add(batch, tokens[i], static_cast<int>(i), {0}, false);
+        batch.token[i] = tokens[i];
+        batch.pos[i] = static_cast<int>(i);
+        batch.n_seq_id[i] = 1;
+        batch.seq_id[i][0] = 0;  // 直接使用已分配的数组
+        batch.logits[i] = false;
     }
+    batch.n_tokens = static_cast<int>(tokens.size());
     batch.logits[batch.n_tokens - 1] = true;
     
     if (llama_decode(model_.ctx(), batch) != 0) {
-        llama_batch_free(batch);
         throw std::runtime_error("Embedding generation failed");
     }
     
@@ -81,7 +130,7 @@ std::vector<float> EmbeddingEngine::generateEmbedding(const std::string& text) {
     embedding.resize(embeddingDim());
     
     int n_embd = llama_model_n_embd(model_.model());
-    float* embeddings_seq = llama_get_embeddings_seq(model_.ctx());
+    float* embeddings_seq = llama_get_embeddings_seq(model_.ctx(), 0);
     
     if (embeddings_seq != nullptr) {
         std::copy(embeddings_seq, embeddings_seq + n_embd, embedding.begin());
@@ -90,11 +139,10 @@ std::vector<float> EmbeddingEngine::generateEmbedding(const std::string& text) {
         if (embeddings != nullptr) {
             std::copy(embeddings, embeddings + n_embd, embedding.begin());
         } else {
-            llama_batch_free(batch);
             throw std::runtime_error("Failed to get embeddings");
         }
     }
     
-    llama_batch_free(batch);
+    // RAII 会自动释放 batch
     return embedding;
 }

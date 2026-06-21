@@ -1,4 +1,4 @@
-#include"VectorDatabase.h"
+#include "vectordatabase.h"
 
 #include <cmath>
 #include <algorithm>
